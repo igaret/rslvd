@@ -1,0 +1,47 @@
+groups:
+  - name: rslvd_alerts
+    rules:
+      - alert: rslvdown
+        expr: up{job="rslvd"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "RSLVD DNS is down"
+          description: "RSLVD DNS has been down for more than 30 seconds"
+
+      - alert: HighQueryRate
+        expr: rate(dns_queries_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High DNS query rate"
+          description: "DNS query rate is {{ $value }} queries/second"
+
+      - alert: HighErrorRate
+        expr: rate(dns_errors_total[5m]) / rate(dns_queries_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High DNS error rate"
+          description: "DNS error rate is {{ $value | humanizePercentage }}"
+
+      - alert: LowCacheHitRate
+        expr: rate(dns_cache_hits_total[5m]) / (rate(dns_cache_hits_total[5m]) + rate(dns_cache_misses_total[5m])) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low DNS cache hit rate"
+          description: "DNS cache hit rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighMemoryUsage
+        expr: dns_memory_usage_bytes / dns_memory_limit_bytes > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "RSLVD DNS memory usage is {{ $value | humanizePercentage }}"

@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  rslvd:
+    build: .
+    container_name: production-rslvd
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+      - "8080:8080/tcp"  # Metrics port
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - dns-zones:/app/config/zones
+    environment:
+      - DNS_LOG_LEVEL=INFO
+      - DNS_ENABLE_METRICS=true
+    restart: unless-stopped
+    networks:
+      - dns-network
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "dig", "@localhost", "-p", "53", "health.check", "A"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dns-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - dns-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dns-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    networks:
+      - dns-network
+    restart: unless-stopped
+
+volumes:
+  dns-zones:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  dns-network:
+    driver: bridge
